@@ -311,6 +311,9 @@ namespace Emailcs
     /// </summary>
     public static class LeitorImapMailKit
     {
+        private static uint ultimoUidProcessado;
+        private static bool cicloInicialConcluido;
+
         /// <summary>
         /// Lê os últimos e-mails da mailbox configurada nas variáveis de ambiente IMAP.
         /// </summary>
@@ -337,9 +340,16 @@ namespace Emailcs
             inbox.Open(FolderAccess.ReadOnly);
 
             var uids = inbox.Search(SearchQuery.All);
-            var selecionados = uids.TakeLast(Math.Max(limite, 1));
+            var limiteSeguro = Math.Max(limite, 1);
+
+            // No primeiro ciclo, processa os ultimos N. Depois, processa apenas UIDs novos.
+            var selecionados = cicloInicialConcluido
+                ? uids.Where(uid => uid.Id > ultimoUidProcessado).TakeLast(limiteSeguro)
+                : uids.TakeLast(limiteSeguro);
 
             var emails = new List<Email>();
+            uint maiorUidDoCiclo = ultimoUidProcessado;
+
             foreach (var uid in selecionados)
             {
                 var msg = inbox.GetMessage(uid);
@@ -351,7 +361,15 @@ namespace Emailcs
                     DataEnvio = msg.Date.LocalDateTime,
                     ImapUid = uid.Id
                 });
+
+                if (uid.Id > maiorUidDoCiclo)
+                {
+                    maiorUidDoCiclo = uid.Id;
+                }
             }
+
+            ultimoUidProcessado = maiorUidDoCiclo;
+            cicloInicialConcluido = true;
 
             client.Disconnect(true);
             return emails;
