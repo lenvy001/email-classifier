@@ -24,7 +24,8 @@ class Program
                 foreach (var email in emails)
                 {
                     var resultado = filtro.Classificar(email);
-                    Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {email.Remetente} => {resultado.Classificacao} | A:{resultado.ScoreRuido:F1} P:{resultado.ScorePrioridade:F1} C:{resultado.ScoreCandidatura:F1}");
+                    var remetenteMascarado = MascararEmail(email.Remetente);
+                    Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {remetenteMascarado} => {resultado.Classificacao} | A:{resultado.ScoreRuido:F1} P:{resultado.ScorePrioridade:F1} C:{resultado.ScoreCandidatura:F1}");
 
                     try
                     {
@@ -47,5 +48,29 @@ class Program
 
             await Task.Delay(TimeSpan.FromSeconds(intervaloSegundos));
         }
+    }
+
+    private static string MascararEmail(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
+        {
+            return "[redacted]";
+        }
+
+        var partes = email.Split('@', 2);
+        var usuario = partes[0];
+        var dominio = partes[1];
+
+        if (usuario.Length == 1)
+        {
+            return $"{usuario}@{dominio}";
+        }
+
+        if (usuario.Length == 2)
+        {
+            return $"{usuario[0]}*@{dominio}";
+        }
+
+        return $"{usuario[0]}***{usuario[^1]}@{dominio}";
     }
 }

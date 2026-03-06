@@ -4,3 +4,11 @@ obj/
 *.suo
 *.log
 .vs/
+
+# Secrets and local environment files
+.env
+.env.*
+*.env
+secrets.json
+appsettings.Development.json
+appsettings.*.local.json
