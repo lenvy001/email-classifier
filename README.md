@@ -70,6 +70,30 @@ Opcionais:
 - `IMAP_APLICAR_MARCADOR` (`1` para sim, `0` para não; default `1`)
 - `WORKER_INTERVAL_SECONDS` (intervalo entre ciclos; default `60`, mínimo `5`)
 
+## Tutorial (Gmail): gerar senha de app para IMAP
+
+Para usar Gmail com IMAP neste projeto, não use sua senha normal da conta.
+Use uma senha de app (16 caracteres):
+
+1. Acesse `https://myaccount.google.com/`.
+2. Entre em `Segurança`.
+3. Ative `Verificação em duas etapas` (2FA), se ainda não estiver ativa.
+4. Volte para `Segurança` e abra `Senhas de app`.
+5. Em `Selecionar app`, escolha `Outro (nome personalizado)` e informe algo como `email-classifier`.
+6. Clique em `Gerar` e copie a senha exibida.
+7. Use essa senha no `IMAP_PASSWORD`.
+
+Exemplo:
+
+```powershell
+$env:IMAP_USER="seuemail@gmail.com"
+$env:IMAP_PASSWORD="SENHA_DE_APP_GERADA_PELO_GOOGLE"
+```
+
+Se `Senhas de app` não aparecer, confira:
+- 2FA está ativa na conta.
+- conta Google Workspace pode ter bloqueio por política do administrador.
+
 ## Executar localmente
 
 ```powershell
