@@ -1,76 +1,75 @@
+using System;
+using System.IO;
+using System.Linq;
 using Emailcs;
 
-/// <summary>
-/// Ponto de entrada da aplicação em modo contínuo para execução 24/7.
-/// </summary>
-class Program
+Console.WriteLine("--- Gerenciador de Candidaturas ---");
+
+// Procura a raiz do projeto (onde está o arquivo .csproj) para não salvar dentro da pasta bin/
+string diretorioBase = AppDomain.CurrentDomain.BaseDirectory;
+while (!Directory.GetFiles(diretorioBase, "*.csproj").Any())
 {
-    static async Task Main(string[] args)
+    var diretorioPai = Directory.GetParent(diretorioBase);
+    if (diretorioPai == null)
     {
-        var intervaloSegundos = int.TryParse(Environment.GetEnvironmentVariable("WORKER_INTERVAL_SECONDS"), out var s)
-            ? Math.Max(s, 5)
-            : 60;
-
-        Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Processador iniciado. Intervalo: {intervaloSegundos}s.");
-
-        var filtro = new FiltroEmail();
-
-        while (true)
-        {
-            try
-            {
-                var emails = LeitorImapMailKit.LerUltimosEmails();
-
-                foreach (var email in emails)
-                {
-                    var resultado = filtro.Classificar(email);
-                    var remetenteMascarado = MascararEmail(email.Remetente);
-                    Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {remetenteMascarado} => {resultado.Classificacao} | A:{resultado.ScoreRuido:F1} P:{resultado.ScorePrioridade:F1} C:{resultado.ScoreCandidatura:F1}");
-
-                    try
-                    {
-                        var aplicouMarcador = LeitorImapMailKit.AplicarMarcador(email, resultado.Classificacao);
-                        if (aplicouMarcador)
-                        {
-                            Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Marcador aplicado no UID {email.ImapUid}.");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Falha ao aplicar marcador no UID {email.ImapUid}: {ex.Message}");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Falha no ciclo de processamento: {ex.Message}");
-            }
-
-            await Task.Delay(TimeSpan.FromSeconds(intervaloSegundos));
-        }
+        diretorioBase = AppDomain.CurrentDomain.BaseDirectory; // Volta pro padrão se não achar
+        break;
     }
+    diretorioBase = diretorioPai.FullName;
+}
 
-    private static string MascararEmail(string email)
+string caminhoArquivo = Path.Combine(diretorioBase, "candidatura csv", "candidaturas.csv");
+var gerenciador = new GerenciadorCandidaturas(caminhoArquivo);
+
+// Carregar candidaturas existentes
+gerenciador.CarregarCsv();
+
+Console.WriteLine("\n--- Verificando E-mails (IMAP) ---");
+try
+{
+    var emails = LeitorImapMailKit.LerUltimosEmails();
+    var filtro = new FiltroEmail();
+
+    if (emails.Count == 0)
     {
-        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
+        Console.WriteLine("Nenhum e-mail novo encontrado.");
+    }
+    else
+    {
+        foreach (var email in emails)
         {
-            return "[redacted]";
+            var resultado = filtro.Classificar(email);
+            
+            Console.WriteLine($"E-mail de: {email.Remetente}");
+            Console.WriteLine($"Assunto: {email.Assunto}");
+            Console.WriteLine($"Classificação: {resultado.Classificacao}");
+            
+            // Opcional: Aplicar marcador no provedor de e-mail (Descomente para usar)
+            // LeitorImapMailKit.AplicarMarcador(email, resultado.Classificacao);
+
+            Console.WriteLine(new string('-', 30));
         }
-
-        var partes = email.Split('@', 2);
-        var usuario = partes[0];
-        var dominio = partes[1];
-
-        if (usuario.Length == 1)
-        {
-            return $"{usuario}@{dominio}";
-        }
-
-        if (usuario.Length == 2)
-        {
-            return $"{usuario[0]}*@{dominio}";
-        }
-
-        return $"{usuario[0]}***{usuario[^1]}@{dominio}";
     }
 }
+catch (Exception ex)
+{
+    Console.WriteLine($"Erro ao verificar e-mails: {ex.Message}");
+    Console.WriteLine("Dica: Verifique se as variáveis de ambiente IMAP estão configuradas.");
+}
+
+Console.WriteLine("\n--- Adicionando dados de exemplo ---");
+gerenciador.Adicionar(new Candidatura
+{
+    Empresa = "INTUO Softwares",
+    Vaga = "Desenvolvedor Júnior",
+    DataCandidatura = DateTime.Today,
+    Status = "Enviado",
+    linkVaga = "https://...",
+    Plataforma = "LinkedIn"
+});
+
+gerenciador.AtualizarStatus("INTUO Softwares", "Desenvolvedor Júnior", DateTime.Today, "Entrevista Agendada");
+
+Console.WriteLine("\n--- Lista de Candidaturas Salvas ---");
+gerenciador.Listar();
+gerenciador.Salvar();
